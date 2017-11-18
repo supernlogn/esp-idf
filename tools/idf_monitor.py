@@ -288,8 +288,8 @@ class Monitor(object):
             self.serial_reader.stop()
         else:
             try:
-                key = self.translate_eol(key)
-                self.serial.write(codecs.encode(key))
+                key = self.translate_eol(bytes(key, 'utf-8'))
+                self.serial.write(key)
             except serial.SerialException:
                 pass # this shouldn't happen, but sometimes port has closed in serial thread
             except UnicodeEncodeError:
@@ -299,17 +299,18 @@ class Monitor(object):
         # this may need to be made more efficient, as it pushes out a byte
         # at a time to the console
         for b in data:
-            self.console.write_bytes(b)
-            if b == b'\n': # end of line
+            s = bytes([b])
+            self.console.write_bytes(s)
+            if s == b'\n': # end of line
                 self.handle_serial_input_line(self._read_line.strip())
                 self._read_line = b""
             else:
-                self._read_line += b
-            self.check_gdbstub_trigger(b)
+                self._read_line += s
+            self.check_gdbstub_trigger(s)
 
     def handle_serial_input_line(self, line):
-        for m in re.finditer(MATCH_PCADDR, line):
-            self.lookup_pc_address(m.group())
+        for m in re.finditer(MATCH_PCADDR, line.decode('utf-8')):
+            self.lookup_pc_address(str(m.group()))
 
     def handle_menu_key(self, c):
         if c == self.exit_key or c == self.menu_key:  # send verbatim
@@ -399,7 +400,7 @@ class Monitor(object):
             ["%saddr2line" % self.toolchain_prefix,
              "-pfiaC", "-e", self.elf_file, pc_addr],
             cwd=".")
-        if not "?? ??:0" in translation:
+        if not "?? ??:0" in str(translation):
             yellow_print(translation)
 
     def check_gdbstub_trigger(self, c):
