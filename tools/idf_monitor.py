@@ -62,6 +62,11 @@ ANSI_RED = '\033[1;31m'
 ANSI_YELLOW = '\033[0;33m'
 ANSI_NORMAL = '\033[0m'
 
+PY3 = sys.version_info >= (3, 0)
+
+if PY3:
+    unichr = chr
+
 def color_print(message, color):
     """ Print a message to stderr with colored highlighting """
     sys.stderr.write("%s%s%s\n" % (color, message,  ANSI_NORMAL))
@@ -247,9 +252,9 @@ class Monitor(object):
         self.exit_key = CTRL_RBRACKET
 
         self.translate_eol = {
-            "CRLF": lambda c: c.replace(b"\n", b"\r\n"),
-            "CR":   lambda c: c.replace(b"\n", b"\r"),
-            "LF":   lambda c: c.replace(b"\r", b"\n"),
+            "CRLF": lambda c: c.replace("\n", "\r\n"),
+            "CR":   lambda c: c.replace("\n", "\r"),
+            "LF":   lambda c: c.replace("\r", "\n"),
         }[eol]
 
         # internal state
@@ -288,8 +293,8 @@ class Monitor(object):
             self.serial_reader.stop()
         else:
             try:
-                key = self.translate_eol(bytes(key, 'utf-8'))
-                self.serial.write(key)
+                key = self.translate_eol(key)
+                self.serial.write(codecs.encode(key, 'ascii'))
             except serial.SerialException:
                 pass # this shouldn't happen, but sometimes port has closed in serial thread
             except UnicodeEncodeError:
@@ -299,14 +304,15 @@ class Monitor(object):
         # this may need to be made more efficient, as it pushes out a byte
         # at a time to the console
         for b in data:
-            s = bytes([b])
-            self.console.write_bytes(s)
-            if s == b'\n': # end of line
+            if PY3:
+                b = bytes([b])
+            self.console.write_bytes(b)
+            if b == b'\n': # end of line
                 self.handle_serial_input_line(self._read_line.strip())
                 self._read_line = b""
             else:
-                self._read_line += s
-            self.check_gdbstub_trigger(s)
+                self._read_line += b
+            self.check_gdbstub_trigger(b)
 
     def handle_serial_input_line(self, line):
         for m in re.finditer(MATCH_PCADDR, line.decode('utf-8')):
@@ -400,7 +406,9 @@ class Monitor(object):
             ["%saddr2line" % self.toolchain_prefix,
              "-pfiaC", "-e", self.elf_file, pc_addr],
             cwd=".")
-        if not "?? ??:0" in str(translation):
+        if PY3:
+            translation = translation.decode('UTF-8');
+        if not "?? ??:0" in translation:
             yellow_print(translation)
 
     def check_gdbstub_trigger(self, c):
