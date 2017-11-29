@@ -231,8 +231,8 @@ class Monitor(object):
             # Use Console.getkey implementation from 3.3.0 (to be in sync with the ConsoleReader._cancel patch above)
             def getkey_patched(self):
                 c = self.enc_stdin.read(1)
-                if c == unicode(0x7f, 'utf-8'):
-                    c = unicode(8, 'utf-8')    # map the BS key (which yields DEL) to backspace
+                if c == unichr(0x7f):
+                    c = unichr(8)    # map the BS key (which yields DEL) to backspace
                 return c
             
             self.console.getkey = types.MethodType(getkey_patched, self.console) 
@@ -288,7 +288,7 @@ class Monitor(object):
             self.serial_reader.stop()
         else:
             try:
-                key = self.translate_eol(bytes(u(""+key), 'utf-8'))
+                key = self.translate_eol(bytes(key, 'utf-8'))
                 self.serial.write(key)
             except serial.SerialException:
                 pass # this shouldn't happen, but sometimes port has closed in serial thread
@@ -299,7 +299,7 @@ class Monitor(object):
         # this may need to be made more efficient, as it pushes out a byte
         # at a time to the console
         for b in data:
-            s = bytes([u(""+b)], 'utf-8')
+            s = bytes([b])
             self.console.write_bytes(s)
             if s == b'\n': # end of line
                 self.handle_serial_input_line(self._read_line.strip())
